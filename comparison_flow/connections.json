@@ -39,16 +39,11 @@
           "node": "04 - Build RAG Request",
           "type": "main",
           "index": 0
-        },
-        {
-          "node": "09 - Build Synthese-Request",
-          "type": "main",
-          "index": 0
         }
       ],
       [
         {
-          "node": "04 - Build RAG Request",
+          "node": "09 - Build Synthese-Request",
           "type": "main",
           "index": 0
         }
@@ -148,6 +143,17 @@
       [
         {
           "node": "13 - Final Report Output",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "13 - Final Report Output": {
+    "main": [
+      [
+        {
+          "node": "14 - Convert to XLSX",
           "type": "main",
           "index": 0
         }
