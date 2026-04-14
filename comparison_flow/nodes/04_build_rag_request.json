@@ -1,11 +1,14 @@
 {
   "parameters": {
     "mode": "runOnceForEachItem",
-    "jsCode": "// ═══════════════════════════════════════════════════════\n// Step 4: Build RAG Request gegen Mitbewerber Collection\n// Generisch: Verwendet die Collection-ID aus der Config\n// ═══════════════════════════════════════════════════════\nconst fact = $input.item.json;\nconst config = fact.config;\n\nreturn {\n  ...fact,\n  retrievalRequestBody: JSON.stringify({\n    collection_names: [config.competitorRagCollection],\n    query: fact.rag_query,\n    k: config.ragTopK\n  })\n};"
+    "jsCode": "// ═══════════════════════════════════════════════════════\n// Step 4: Build RAG Request gegen Mitbewerber Collection\n// Generisch: Verwendet die Collection-ID des aktuellen Mitbewerbers\n// ═══════════════════════════════════════════════════════\nconst fact = $input.item.json;\nconst config = fact.config;\nconst competitor = config.currentCompetitor;\n\nreturn {\n  ...fact,\n  retrievalRequestBody: JSON.stringify({\n    collection_names: [competitor.ragCollection],\n    query: fact.rag_query,\n    k: config.ragTopK\n  })\n};"
   },
   "id": "a1b2c3d4-0004-4000-a000-000000000004",
   "name": "04 - Build RAG Request",
   "type": "n8n-nodes-base.code",
   "typeVersion": 2,
-  "position": [-3880, 400]
+  "position": [
+    -3880,
+    400
+  ]
 }
