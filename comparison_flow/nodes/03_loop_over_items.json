@@ -1,0 +1,12 @@
+{
+  "parameters": {
+    "options": {
+      "reset": false
+    }
+  },
+  "id": "a1b2c3d4-0003-4000-a000-000000000003",
+  "name": "03 - Loop Over Items",
+  "type": "n8n-nodes-base.splitInBatches",
+  "typeVersion": 3,
+  "position": [-4120, 400]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "Generischer AVB-Vergleich - Mitbewerber Dokumente",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": [
+    {
+      "name": "AVB-Vergleich"
+    },
+    {
+      "name": "Generisch"
+    },
+    {
+      "name": "Mitbewerber"
+    }
+  ]
+}

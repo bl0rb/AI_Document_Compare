@@ -1,0 +1,157 @@
+{
+  "Manual Trigger": {
+    "main": [
+      [
+        {
+          "node": "01 - Config Parameters",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "01 - Config Parameters": {
+    "main": [
+      [
+        {
+          "node": "02 - Eigene Fakten + RAG Queries",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "02 - Eigene Fakten + RAG Queries": {
+    "main": [
+      [
+        {
+          "node": "03 - Loop Over Items",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "03 - Loop Over Items": {
+    "main": [
+      [
+        {
+          "node": "04 - Build RAG Request",
+          "type": "main",
+          "index": 0
+        },
+        {
+          "node": "09 - Build Synthese-Request",
+          "type": "main",
+          "index": 0
+        }
+      ],
+      [
+        {
+          "node": "04 - Build RAG Request",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "04 - Build RAG Request": {
+    "main": [
+      [
+        {
+          "node": "05 - RAG Retrieve Mitbewerber AVB",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "05 - RAG Retrieve Mitbewerber AVB": {
+    "main": [
+      [
+        {
+          "node": "06 - Parse RAG + Build LLM Request",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "06 - Parse RAG + Build LLM Request": {
+    "main": [
+      [
+        {
+          "node": "07 - LLM Fakt-Vergleich",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "07 - LLM Fakt-Vergleich": {
+    "main": [
+      [
+        {
+          "node": "08 - Parse Vergleichsergebnis",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "08 - Parse Vergleichsergebnis": {
+    "main": [
+      [
+        {
+          "node": "03 - Loop Over Items",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "09 - Build Synthese-Request": {
+    "main": [
+      [
+        {
+          "node": "10 - LLM Gesamtvergleich",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "10 - LLM Gesamtvergleich": {
+    "main": [
+      [
+        {
+          "node": "11 - Parse Gesamtvergleich",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "11 - Parse Gesamtvergleich": {
+    "main": [
+      [
+        {
+          "node": "12 - Build Report Table",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  },
+  "12 - Build Report Table": {
+    "main": [
+      [
+        {
+          "node": "13 - Final Report Output",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    ]
+  }
+}
