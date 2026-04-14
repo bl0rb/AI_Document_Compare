@@ -1,0 +1,380 @@
+{
+  "name": "AVB Vergleich HMR vs ERV Seminarversicherung v2",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "fc242ffa-eb90-4ad5-a20e-41b485accaed",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -4640,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════════\n// Step 1: HMR Fakten + RAG-Queries\n// HMR-Daten = hardcoded aus Excel\n// ERV-Daten = werden per RAG abgefragt (erv_excel nur Benchmark)\n// ═══════════════════════════════════════════════════════\n\nconst facts = [\n  {\n    id: 1,\n    kategorie: 'Produktuebersicht',\n    aspekt: 'Produktname und Versicherungssparten',\n    hmr: 'Seminar-Ruecktrittsversicherung. Sparte: Reise-Ruecktritt. Geltungsbereich: Europa.',\n    rag_query: 'Wie heisst das Produkt der ERGO Reiseversicherung fuer Seminare? Welche Sparten sind enthalten? Welcher raeumliche Geltungsbereich gilt?',\n    benchmark_erv: 'Seminar-Versicherung. Sparten: Reise-Ruecktritt und Reiseabbruch. Geltungsbereich: weltweit.'\n  },\n  {\n    id: 2,\n    kategorie: 'Produktuebersicht',\n    aspekt: 'AVB-Version und Selbstbehalt',\n    hmr: 'AVB: VB-RS 2021 (T-Seminar-D). Selbstbehalt: 20% bei ambulant behandelten Erkrankungen, mind. 25 EUR je versicherter Person.',\n    rag_query: 'Welche Versicherungsbedingungen (AVB) gelten fuer die ERGO Seminar-Versicherung? Gibt es einen Selbstbehalt oder eine Selbstbeteiligung?',\n    benchmark_erv: 'VB-ERV/Seminar 2017. Kein Selbstbehalt.'\n  },\n  {\n    id: 3,\n    kategorie: 'Versicherte Leistungen - Ruecktritt',\n    aspekt: 'Stornokosten bei Nichtantritt des Seminars',\n    hmr: 'Uebernahme der Stornokosten fuer das nicht angetretene Seminar.',\n    rag_query: 'Was erstattet die ERGO Seminar-Versicherung bei Stornierung bzw. Ruecktritt vom Seminar? Werden auch Stornokosten fuer Seminarreihen und zusaetzliche Reiseleistungen uebernommen?',\n    benchmark_erv: 'Uebernahme der Stornokosten fuer das Seminar bzw. fuer nicht besuchte Teilveranstaltungen der Seminarreihe. Uebernahme der Stornokosten fuer mitversicherte Reiseleistungen.'\n  },\n  {\n    id: 4,\n    kategorie: 'Versicherte Leistungen - Ruecktritt',\n    aspekt: 'Verspaeteter Seminarantritt',\n    hmr: 'Erstattung der Hinreise-Mehrkosten bis maximal zur Hoehe der Stornokosten, die bei einer Stornierung anfallen.',\n    rag_query: 'Was leistet die ERGO Seminar-Versicherung bei verspaetem Seminarantritt? Werden Mehrkosten der Anreise und nicht genutzte Seminarleistungen erstattet?',\n    benchmark_erv: 'Erstattung der Mehrkosten der Anreise. Erstattung der nicht genutzten Seminar- und Reiseleistungen abzueglich der Anreisekosten.'\n  },\n  {\n    id: 5,\n    kategorie: 'Versicherte Leistungen - Ruecktritt',\n    aspekt: 'Verspaetung oeffentliches Verkehrsmittel (mehr als 2 Stunden)',\n    hmr: 'Erstattung der Hinreise-Mehrkosten bis maximal zur Hoehe der Stornokosten.',\n    rag_query: 'Was erstattet die ERGO Seminar-Versicherung bei Verspaetung eines oeffentlichen Verkehrsmittels um mehr als zwei Stunden? Gibt es einen Verspaetungsschutz mit Betraegen fuer Anreise-Mehrkosten, Verpflegung und Unterkunft?',\n    benchmark_erv: 'Erstattung der Anreise-Mehrkosten bis 500 EUR. Kosten fuer Verpflegung sowie Unterkunft bis 100 EUR.'\n  },\n  {\n    id: 6,\n    kategorie: 'Versicherte Leistungen - Ruecktritt',\n    aspekt: 'Panne oder Unfall des eigenen Kraftfahrzeugs',\n    hmr: 'Nicht versichert. Nur wenn dadurch das versicherte Verkehrsmittel versaeumt wird: Erstattung der Hinreise-Mehrkosten bis maximal zur Hoehe der Stornokosten.',\n    rag_query: 'Was leistet die ERGO Seminar-Versicherung bei Panne oder Unfall des eigenen Kraftfahrzeugs? Werden Kosten fuer nicht genutzte Leistungen, zusaetzliche Reisekosten oder ein Mietfahrzeug erstattet?',\n    benchmark_erv: 'Erstattung der Kosten fuer nicht in Anspruch genommene Seminar- und Reiseleistungen oder zusaetzliche Reisekosten bis 500 EUR. Kostenerstattung fuer ein Mietfahrzeug bis 1.000 EUR.'\n  },\n  {\n    id: 7,\n    kategorie: 'Versicherte Leistungen - Ruecktritt',\n    aspekt: 'Umbuchung des Seminars',\n    hmr: 'Erstattung der Umbuchungskosten bis maximal zur Hoehe der Stornokosten.',\n    rag_query: 'Sind Umbuchungsgebuehren bei der ERGO Seminar-Versicherung versichert? Bis zu welcher Hoehe werden Umbuchungsgebuehren erstattet?',\n    benchmark_erv: 'Erstattung der Umbuchungsgebuehren, max. bis zur Hoehe der Stornokosten.'\n  },\n  {\n    id: 8,\n    kategorie: 'Reiseabbruch',\n    aspekt: 'Abbruch des Seminars',\n    hmr: 'Nicht versichert.',\n    rag_query: 'Was leistet die ERGO Seminar-Versicherung bei Abbruch des Seminars? Werden anteilige Preise fuer nicht genutzte Leistungen und zusaetzliche Rueckreisekosten erstattet?',\n    benchmark_erv: 'Erstattung des anteiligen Preises fuer nicht genutzte Seminar- und Reiseleistungen vor Ort. Erstattung der zusaetzlichen Rueckreisekosten.'\n  },\n  {\n    id: 9,\n    kategorie: 'Reiseabbruch',\n    aspekt: 'Verspaetete Rueckreise vom Seminar',\n    hmr: 'Nicht versichert.',\n    rag_query: 'Hilft die ERGO Seminar-Versicherung bei verspaeteter Rueckreise vom Seminar? Wird die Rueckreise organisiert oder ein Darlehen fuer Mehrkosten gewaehrt?',\n    benchmark_erv: 'Organisation der Rueckreise und Darlehen fuer Rueckreise-Mehrkosten.'\n  },\n  {\n    id: 10,\n    kategorie: 'Reiseabbruch',\n    aspekt: 'Verlaengerter Aufenthalt wegen stationaerer Behandlung',\n    hmr: 'Nicht versichert.',\n    rag_query: 'Erstattet die ERGO Seminar-Versicherung zusaetzliche Unterkunftskosten bei verlaengertem Aufenthalt wegen stationaerer Behandlung? Bis zu welchem Betrag?',\n    benchmark_erv: 'Erstattung zusaetzlicher Unterkunftskosten bis zu 1.500 EUR je Versicherungsfall.'\n  },\n  {\n    id: 11,\n    kategorie: 'Reiseabbruch',\n    aspekt: 'Verlaengerter Aufenthalt wegen ambulanter Behandlung',\n    hmr: 'Nicht versichert.',\n    rag_query: 'Erstattet die ERGO Seminar-Versicherung zusaetzliche Unterkunftskosten bei verlaengertem Aufenthalt wegen ambulanter Behandlung? Bis zu welchem Betrag?',\n    benchmark_erv: 'Erstattung zusaetzlicher Unterkunftskosten bis zu 750 EUR je Versicherungsfall.'\n  },\n  {\n    id: 12,\n    kategorie: 'Reiseabbruch',\n    aspekt: 'Verlaengerter Aufenthalt wegen Feuer oder Elementarereignissen',\n    hmr: 'Nicht versichert.',\n    rag_query: 'Was leistet die ERGO Seminar-Versicherung bei Feuer oder Elementarereignissen am Seminarort? Werden Mehrkosten fuer verlaengerten Aufenthalt und ausserplanmaessige Rueckreise erstattet?',\n    benchmark_erv: 'Mehrkosten fuer verlaengerten Aufenthalt. Mehrkosten fuer ausserplanmaessige Rueckreise.'\n  },\n  {\n    id: 13,\n    kategorie: 'Versicherte Ereignisse',\n    aspekt: 'Nichtversetzung als Schueler oder Student',\n    hmr: 'Versichert.',\n    rag_query: 'Ist Nichtversetzung eines Schuelers oder Studenten ein versichertes Ereignis bei der ERGO Seminar-Versicherung? Welche Pruefungsereignisse sind versichert?',\n    benchmark_erv: 'Nicht versichert.'\n  },\n  {\n    id: 14,\n    kategorie: 'Versicherte Ereignisse',\n    aspekt: 'Panne oder Unfall des Kraftfahrzeuges als Ruecktrittsgrund',\n    hmr: 'Nicht direkt versichert. Nur indirekt wenn dadurch das versicherte Verkehrsmittel versaeumt wird.',\n    rag_query: 'Ist Panne oder Unfall des eigenen Kraftfahrzeugs ein versichertes Ereignis bei der ERGO Seminar-Versicherung das zum Ruecktritt berechtigt?',\n    benchmark_erv: 'Versichert.'\n  },\n  {\n    id: 15,\n    kategorie: 'Versicherte Ereignisse',\n    aspekt: 'Erkrankung, Unfall oder Tod eines Hundes oder einer Katze',\n    hmr: 'Versichert.',\n    rag_query: 'Ist die Erkrankung, der Unfall oder Tod eines Hundes oder einer Katze ein versichertes Ereignis bei der ERGO Seminar-Versicherung?',\n    benchmark_erv: 'Nicht versichert.'\n  },\n  {\n    id: 16,\n    kategorie: 'Versicherte Ereignisse',\n    aspekt: 'Feuer oder Elementarereignisse am Seminarort',\n    hmr: 'Nicht versichert.',\n    rag_query: 'Sind Feuer oder Elementarereignisse am Seminarort versicherte Ereignisse bei der ERGO Seminar-Versicherung? Was zaehlt als Elementarereignis?',\n    benchmark_erv: 'Versichert.'\n  },\n  {\n    id: 17,\n    kategorie: 'Versicherte Ereignisse',\n    aspekt: 'Absage durch den Veranstalter',\n    hmr: 'Nicht versichert.',\n    rag_query: 'Ist die Absage des Seminars durch den Veranstalter ein versichertes Ereignis bei der ERGO Seminar-Versicherung? Was wird in diesem Fall erstattet?',\n    benchmark_erv: 'Versichert.'\n  },\n  {\n    id: 18,\n    kategorie: 'Weiteres',\n    aspekt: 'Mitversicherung zusaetzlich gebuchter Reiseleistungen',\n    hmr: 'Nicht versichert. Die Versicherungssumme sichert den Seminarpreis ab. Weitere Reiseleistungen muessen separat versichert werden.',\n    rag_query: 'Sind zusaetzlich gebuchte Reiseleistungen wie Anreise, Rueckreise und Unterkunft bei der ERGO Seminar-Versicherung mitversichert? Welche zeitlichen Voraussetzungen gelten?',\n    benchmark_erv: 'Versichert, vorausgesetzt sie liegen innerhalb 48 Stunden vor Beginn bis 48 Stunden nach Ende des Seminars.'\n  },\n  {\n    id: 19,\n    kategorie: 'Weiteres',\n    aspekt: 'Maximal versicherbarer Zeitraum und Seminarreihen',\n    hmr: '1 Seminarreise, unabhaengig von der Seminardauer. Bei Seminarreihen muss jedes Modul separat abgeschlossen werden.',\n    rag_query: 'Wie lange ist der maximal versicherbare Zeitraum bei der ERGO Seminar-Versicherung? Koennen Seminarreihen mit mehreren Teilveranstaltungen versichert werden? Bis zu welcher Dauer?',\n    benchmark_erv: '1 Seminarreise oder -reihe, unabhaengig von der Seminardauer, auch fuer Seminarreihen bis 2 Jahre.'\n  },\n  {\n    id: 20,\n    kategorie: 'Weiteres',\n    aspekt: 'Abschlussfristen',\n    hmr: 'Abschluss bis 30 Tage vor Reisebeginn oder spaetestens bis zum 3. Werktag nach der Reisebuchung.',\n    rag_query: 'Welche Abschlussfristen gelten fuer die ERGO Seminar-Versicherung? Bis wann muss der Versicherungsvertrag abgeschlossen werden?',\n    benchmark_erv: 'Am Buchungstag, spaetestens 30 Tage vor planmaessigem Antritt. Bei Buchung innerhalb von 30 Tagen vor Antritt nur am Buchungstag, spaetestens innerhalb der naechsten 3 Werktage.'\n  }\n];\n\nreturn facts.map(f => ({ json: f }));"
+      },
+      "id": "61d9d889-1a2c-4b80-b298-668d3bb8c027",
+      "name": "01 - HMR Fakten + RAG Queries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4400,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        }
+      },
+      "id": "41899a3a-5019-423d-aef8-aeb66f9b0ea1",
+      "name": "02 - Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -4160,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ═══════════════════════════════════════════════════════\n// Step 3: Build RAG Request gegen ERGO Collection\n// Die Query ist so formuliert, dass sie die ERGO-AVB\n// nach dem jeweiligen Aspekt durchsucht\n// ═══════════════════════════════════════════════════════\nconst fact = $input.item.json;\nconst ERGO_COLLECTION = '32c26a09-6c8c-449c-a060-1146f20c0322';\n\nreturn {\n  ...fact,\n  retrievalRequestBody: JSON.stringify({\n    collection_names: [ERGO_COLLECTION],\n    query: fact.rag_query,\n    k: 5\n  })\n};"
+      },
+      "id": "7f8168fe-9b17-4229-86f3-cf9e4dfa6c40",
+      "name": "03 - Build RAG Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3920,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://aihubtest.hanse-merkur.de/api/v1/retrieval/query/collection",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer sk-20508f37f10847dcb27bb565af0063da"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.retrievalRequestBody }}",
+        "options": {}
+      },
+      "id": "b2ad12a3-161e-4736-b298-f82f5690826c",
+      "name": "04 - RAG Retrieve ERGO AVB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -3680,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ═══════════════════════════════════════════════════════\n// Step 5: Parse RAG + Build LLM Comparison Request\n// WICHTIG: Das LLM soll die ERGO-Infos AUS DEM RAG\n// extrahieren, NICHT aus hardcoded Daten\n// ═══════════════════════════════════════════════════════\nconst ragResp = $input.item.json;\nconst fact = $('03 - Build RAG Request').item.json;\n\nconst docs = ragResp.documents?.[0] || [];\nconst metas = ragResp.metadatas?.[0] || [];\nconst dists = ragResp.distances?.[0] || [];\n\nconst contextChunks = docs.map((text, i) => {\n  const meta = metas[i] || {};\n  const source = (meta.name || meta.source || 'Unbekannt')\n    .replace(/\\.md\\.txt$|\\.txt$|\\.md$/gi, '').replace(/_/g, ' ').trim();\n  const dist = dists[i] || 'N/A';\n  return '### Chunk ' + (i+1) + ' (Quelle: ' + source + ', Distance: ' + (typeof dist === 'number' ? dist.toFixed(3) : dist) + ')\\n' + text;\n}).join('\\n\\n');\n\nconst systemPrompt = 'Du bist ein Versicherungsexperte, der AVB (Allgemeine Versicherungsbedingungen) analysiert und vergleicht.\\n\\nDeine Aufgabe: Analysiere die bereitgestellten ERGO AVB-Dokumente zu einem bestimmten Aspekt und vergleiche das Ergebnis mit der HanseMerkur Seminar-Ruecktrittsversicherung.\\n\\n## WICHTIGE REGELN:\\n1. Extrahiere die ERGO-Informationen AUSSCHLIEssLICH aus den bereitgestellten RAG-Dokumenten\\n2. Wenn die Dokumente KEINE Information zu diesem Aspekt enthalten, schreibe klar: \"In den vorliegenden ERGO AVB wurde hierzu keine Regelung gefunden.\"\\n3. ERFINDE KEINE Informationen - nur was in den Dokumenten steht\\n4. Sei praezise: Nenne konkrete Betraege, Prozentsaetze, Bedingungen, Paragraphen\\n5. Zitiere relevante Passagen aus den Dokumenten\\n6. Bewerte am Ende: Welcher Anbieter bietet hier den besseren Schutz? (HMR besser / ERGO besser / gleichwertig / nicht vergleichbar)\\n7. Antworte auf Deutsch in strukturierter Form\\n\\n## Bereitgestellte ERGO AVB-Dokumente:\\n' + contextChunks;\n\nconst userPrompt = 'Analysiere und vergleiche folgenden Aspekt:\\n\\n**Kategorie:** ' + fact.kategorie + '\\n**Aspekt:** ' + fact.aspekt + '\\n\\n**HanseMerkur (HMR) Regelung:**\\n' + fact.hmr + '\\n\\n**Frage an die ERGO AVB:**\\n' + fact.rag_query + '\\n\\nBitte:\\n1. Was genau sagen die ERGO AVB-Dokumente zu diesem Aspekt? Zitiere relevante Stellen.\\n2. Fasse die ERGO-Regelung in 1-3 Saetzen zusammen\\n3. Vergleiche mit der HMR-Regelung: Was sind die konkreten Unterschiede?\\n4. Bewertung: Wer bietet den besseren Schutz fuer diesen Aspekt?';\n\nreturn {\n  ...fact,\n  ragContext: contextChunks,\n  ragChunkCount: docs.length,\n  ragDistances: dists.filter(d => typeof d === 'number').map(d => d.toFixed(3)),\n  requestBody: JSON.stringify({\n    model: 'qwen3:30b-a3b-instruct-2507-q8_0',\n    messages: [\n      { role: 'system', content: systemPrompt },\n      { role: 'user', content: userPrompt }\n    ],\n    temperature: 0.2,\n    max_tokens: 1200,\n    stream: false\n  })\n};"
+      },
+      "id": "dc956648-fbbc-499e-a2f4-44e2963ecf3b",
+      "name": "05 - Parse RAG + Build LLM Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3440,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://aihubtest.hanse-merkur.de/api/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer sk-20508f37f10847dcb27bb565af0063da"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.requestBody }}",
+        "options": {}
+      },
+      "id": "6210f04e-8dc3-48ac-acb4-8f244c33b5b0",
+      "name": "06 - LLM Fakt-Vergleich",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -3200,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ═══════════════════════════════════════════════════════\n// Step 7: Parse LLM Result + Benchmark-Abgleich\n// Fuehrt den Excel-Benchmark-Wert mit, damit man\n// spaeter pruefen kann ob das RAG korrekt war\n// ═══════════════════════════════════════════════════════\nconst llmResp = $input.item.json;\nconst fact = $('05 - Parse RAG + Build LLM Request').item.json;\n\nlet answer = (llmResp.choices?.[0]?.message?.content || '')\n  .replace(/<think>[\\s\\S]*?<\\/think>/g, '')\n  .trim();\n\nreturn {\n  id: fact.id,\n  kategorie: fact.kategorie,\n  aspekt: fact.aspekt,\n  hmr: fact.hmr,\n  benchmark_erv: fact.benchmark_erv,\n  vergleich_aus_rag: answer,\n  ragChunkCount: fact.ragChunkCount,\n  ragDistances: fact.ragDistances,\n  tokens: llmResp.usage?.total_tokens || 0\n};"
+      },
+      "id": "69030000-eecc-4205-9da4-0d2da9792433",
+      "name": "07 - Parse Vergleichsergebnis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2960,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════════\n// Step 10: Build Final Synthesis\n// Sammelt ALLE Einzelvergleiche und baut den\n// finalen LLM-Request fuer die Gesamtgegenueberstellung\n// Benchmark-Werte werden mitgegeben zur Qualitaetskontrolle\n// ═══════════════════════════════════════════════════════\nconst allItems = $input.all();\nconst results = allItems.map(item => item.json);\n\nconst comparisonSections = results.map(r => {\n  return '## ' + r.id + '. ' + r.kategorie + ' - ' + r.aspekt + '\\n\\n' +\n    '**HanseMerkur (HMR):** ' + r.hmr + '\\n\\n' +\n    '**ERGO laut RAG-Analyse:**\\n' + r.vergleich_aus_rag + '\\n\\n' +\n    '**Benchmark (Excel-Referenz):** ' + r.benchmark_erv + '\\n' +\n    '*RAG Chunks: ' + r.ragChunkCount + ' | Distances: ' + (r.ragDistances || []).join(', ') + '*\\n';\n}).join('\\n---\\n\\n');\n\nconst systemPrompt = 'Du bist ein Versicherungsexperte der HanseMerkur. ' +\n  'Du erstellst eine Executive Summary eines AVB-Vergleichs zwischen der ' +\n  'HanseMerkur Seminar-Ruecktrittsversicherung und der ERGO Seminar-Versicherung.\\n\\n' +\n  'Die Einzelvergleiche basieren auf einer RAG-Analyse der ERGO AVB-Dokumente. ' +\n  'Zusaetzlich ist ein Benchmark-Wert aus einer manuellen Excel-Analyse angegeben.\\n\\n' +\n  '## Aufgabe:\\n' +\n  'Erstelle basierend auf den Einzelvergleichen eine strukturierte Gegenueberstellung mit:\\n\\n' +\n  '1. **Executive Summary** (3-5 Saetze Gesamtbewertung)\\n' +\n  '2. **Vorteile HanseMerkur** (Bullet-Liste: wo HMR besser ist, mit konkreten Details)\\n' +\n  '3. **Vorteile ERGO** (Bullet-Liste: wo ERGO besser ist, mit konkreten Details)\\n' +\n  '4. **Gleichwertige Leistungen** (wo beide aehnlich sind)\\n' +\n  '5. **Kritische Unterschiede** (die wichtigsten Differenzen fuer die Kundenberatung)\\n' +\n  '6. **Handlungsempfehlung fuer Produktmanagement** (wo sollte HMR nachbessern?)\\n' +\n  '7. **RAG-Qualitaetsbericht** (Vergleiche die RAG-Ergebnisse mit den Benchmark-Werten: ' +\n  'Wo stimmen sie ueberein? Wo gibt es Abweichungen? ' +\n  'Welche Aspekte konnten nicht aus den AVB ermittelt werden?)\\n\\n' +\n  'Formatiere als Markdown. Sei praezise und faktenbasiert. ' +\n  'Unterscheide klar zwischen Fakten aus den AVB und eigenen Bewertungen.';\n\nconst userPrompt = 'Hier sind die ' + results.length + ' Einzelvergleiche ' +\n  '(jeweils mit RAG-Ergebnis und Excel-Benchmark):\\n\\n' +\n  comparisonSections + '\\n\\n' +\n  'Erstelle bitte die Gesamtgegenueberstellung mit RAG-Qualitaetsbericht.';\n\nreturn [{\n  json: {\n    allResults: results,\n    resultCount: results.length,\n    requestBody: JSON.stringify({\n      model: 'qwen3:30b-a3b-instruct-2507-q8_0',\n      messages: [\n        { role: 'system', content: systemPrompt },\n        { role: 'user', content: userPrompt }\n      ],\n      temperature: 0.3,\n      max_tokens: 4000,\n      stream: false\n    })\n  }\n}];"
+      },
+      "id": "4cec3ea7-1a02-4046-90ad-9ff49ce5a58b",
+      "name": "10 - Build Synthese-Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3760,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://aihubtest.hanse-merkur.de/api/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer sk-20508f37f10847dcb27bb565af0063da"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.requestBody }}",
+        "options": {}
+      },
+      "id": "f3bba41b-ea42-43bd-b2f4-31725fc1b75f",
+      "name": "11 - LLM Gesamtvergleich",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -3168,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ═══════════════════════════════════════════════════════\n// Step 12: Parse Final Synthesis + Build Output\n// ═══════════════════════════════════════════════════════\nconst llmResp = $input.item.json;\nconst synthData = $('10 - Build Synthese-Request').item.json;\n\nlet synthesis = (llmResp.choices?.[0]?.message?.content || '')\n  .replace(/<think>[\\s\\S]*?<\\/think>/g, '')\n  .trim();\n\nconst usage = llmResp.usage || {};\n\nreturn {\n  gesamtvergleich: synthesis,\n  einzelvergleiche: synthData.allResults,\n  anzahlFakten: synthData.resultCount,\n  model: llmResp.model || 'qwen3:30b-a3b-instruct-2507-q8_0',\n  usage: {\n    promptTokens: usage.prompt_tokens || 0,\n    completionTokens: usage.completion_tokens || 0,\n    totalTokens: usage.total_tokens || 0\n  },\n  timestamp: new Date().toISOString(),\n  status: 'completed'\n};"
+      },
+      "id": "e8f4c56f-5b11-41af-9a04-87805365c2f4",
+      "name": "12 - Parse Gesamtvergleich",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2800,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ═══════════════════════════════════════════════════════\n// Step 13: Final Output - Console/Debug Output\n// No Teams, no Webhook - just structured result\n// ═══════════════════════════════════════════════════════\nconst data = $input.item.json;\n\nconst einzelDetails = (data.einzelvergleiche || []).map(e => {\n  return '### ' + e.id + '. ' + e.kategorie + ' - ' + e.aspekt + '\\n' +\n    '| Aspekt | HanseMerkur | ERGO (Benchmark) |\\n' +\n    '|--------|-------------|------------------|\\n' +\n    '| Leistung | ' + e.hmr + ' | ' + e.benchmark_erv + ' |\\n\\n' +\n    '**RAG-basierter Vergleich:**\\n' + e.vergleich_aus_rag + '\\n\\n' +\n    '*RAG Chunks: ' + e.ragChunkCount +\n    ' | Distances: ' + (e.ragDistances || []).join(', ') +\n    ' | Tokens: ' + e.tokens + '*\\n';\n}).join('\\n---\\n\\n');\n\nconst fullReport = '# AVB-Vergleich: HanseMerkur vs. ERGO Seminarversicherung\\n\\n' +\n  '**Erstellt:** ' + data.timestamp + '\\n' +\n  '**Modell:** ' + data.model + '\\n' +\n  '**Verglichene Fakten:** ' + data.anzahlFakten + '\\n' +\n  '**Gesamt-Tokens Synthese:** ' + data.usage.totalTokens + '\\n' +\n  '**ERGO-Datenquelle:** RAG Collection 32c26a09-6c8c-449c-a060-1146f20c0322\\n\\n' +\n  '---\\n\\n' +\n  '# Executive Summary und Gegenueberstellung\\n\\n' +\n  data.gesamtvergleich + '\\n\\n' +\n  '---\\n\\n' +\n  '# Einzelvergleiche (RAG-basiert)\\n\\n' +\n  einzelDetails;\n\nreturn {\n  report: fullReport,\n  gesamtvergleich: data.gesamtvergleich,\n  einzelvergleiche: data.einzelvergleiche,\n  meta: {\n    anzahlFakten: data.anzahlFakten,\n    model: data.model,\n    usage: data.usage,\n    timestamp: data.timestamp,\n    status: data.status,\n    ergo_source: 'RAG Collection 32c26a09-6c8c-449c-a060-1146f20c0322'\n  }\n};"
+      },
+      "id": "db44f3c1-d6c9-4c0b-91ba-ef9b37c87ecd",
+      "name": "13 - Final Report Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2400,
+        64
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "01 - HMR Fakten + RAG Queries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "01 - HMR Fakten + RAG Queries": {
+      "main": [
+        [
+          {
+            "node": "02 - Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 - Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "03 - Build RAG Request",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "10 - Build Synthese-Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "03 - Build RAG Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "03 - Build RAG Request": {
+      "main": [
+        [
+          {
+            "node": "04 - RAG Retrieve ERGO AVB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04 - RAG Retrieve ERGO AVB": {
+      "main": [
+        [
+          {
+            "node": "05 - Parse RAG + Build LLM Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05 - Parse RAG + Build LLM Request": {
+      "main": [
+        [
+          {
+            "node": "06 - LLM Fakt-Vergleich",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "06 - LLM Fakt-Vergleich": {
+      "main": [
+        [
+          {
+            "node": "07 - Parse Vergleichsergebnis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "07 - Parse Vergleichsergebnis": {
+      "main": [
+        [
+          {
+            "node": "02 - Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10 - Build Synthese-Request": {
+      "main": [
+        [
+          {
+            "node": "11 - LLM Gesamtvergleich",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "11 - LLM Gesamtvergleich": {
+      "main": [
+        [
+          {
+            "node": "12 - Parse Gesamtvergleich",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "12 - Parse Gesamtvergleich": {
+      "main": [
+        [
+          {
+            "node": "13 - Final Report Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "dbcf13f0-89f5-487e-bc26-82d0c194a1bb",
+  "meta": {
+    "instanceId": "c74c937177c649ef1f6423ea0d6ca310201d0c64ce13f247808f4181e4b828f5"
+  },
+  "id": "aSpdiPF1o1sX3FAw",
+  "tags": [
+    {
+      "name": "AVB-Vergleich",
+      "id": "h4UjyIie0avPoAlb",
+      "updatedAt": "2026-04-14T12:56:40.836Z",
+      "createdAt": "2026-04-14T12:56:40.836Z"
+    },
+    {
+      "name": "Seminarversicherung",
+      "id": "nFtMrP6EexI4jakz",
+      "updatedAt": "2026-04-14T12:56:40.837Z",
+      "createdAt": "2026-04-14T12:56:40.837Z"
+    }
+  ]
+}
