@@ -1,0 +1,34 @@
+{
+  "parameters": {
+    "method": "POST",
+    "url": "={{ $('01 - Config Parameters').first().json.config.apiBaseUrl }}{{ $('01 - Config Parameters').first().json.config.llmEndpoint }}",
+    "sendHeaders": true,
+    "headerParameters": {
+      "parameters": [
+        {
+          "name": "Authorization",
+          "value": "=Bearer {{ $credentials.httpHeaderAuth.value }}"
+        },
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    "sendBody": true,
+    "specifyBody": "json",
+    "jsonBody": "={{ $json.requestBody }}",
+    "options": {}
+  },
+  "id": "a1b2c3d4-0010-4000-a000-000000000010",
+  "name": "10 - LLM Gesamtvergleich",
+  "type": "n8n-nodes-base.httpRequest",
+  "typeVersion": 4.2,
+  "position": [-3120, 16],
+  "credentials": {
+    "httpHeaderAuth": {
+      "id": "CREDENTIAL_ID_HERE",
+      "name": "AI Hub API Key"
+    }
+  }
+}

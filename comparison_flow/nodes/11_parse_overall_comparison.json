@@ -1,0 +1,11 @@
+{
+  "parameters": {
+    "mode": "runOnceForEachItem",
+    "jsCode": "// ═══════════════════════════════════════════════════════\n// Step 11: Parse Final Synthesis + Build Output\n// ═══════════════════════════════════════════════════════\nconst llmResp = $input.item.json;\nconst synthData = $('09 - Build Synthese-Request').item.json;\nconst config = synthData.config;\n\nlet synthesis = (llmResp.choices?.[0]?.message?.content || '')\n  .replace(/<think>[\\s\\S]*?<\\/think>/g, '')\n  .trim();\n\nconst usage = llmResp.usage || {};\n\nreturn {\n  gesamtvergleich: synthesis,\n  einzelvergleiche: synthData.allResults,\n  anzahlFakten: synthData.resultCount,\n  model: llmResp.model || config.llmModel,\n  config: config,\n  usage: {\n    promptTokens: usage.prompt_tokens || 0,\n    completionTokens: usage.completion_tokens || 0,\n    totalTokens: usage.total_tokens || 0\n  },\n  timestamp: new Date().toISOString(),\n  status: 'completed'\n};"
+  },
+  "id": "a1b2c3d4-0011-4000-a000-000000000011",
+  "name": "11 - Parse Gesamtvergleich",
+  "type": "n8n-nodes-base.code",
+  "typeVersion": 2,
+  "position": [-2760, 16]
+}

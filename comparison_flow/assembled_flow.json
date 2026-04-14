@@ -1,0 +1,440 @@
+{
+  "name": "Generischer AVB-Vergleich - Mitbewerber Dokumente",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "fc242ffa-eb90-4ad5-a20e-41b485accaed",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -4840,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ═══════════════════════════════════════════════════════\n// Step 1: Konfiguration - Generische Parameter\n// Hier werden alle variablen Parameter definiert,\n// die den Flow fuer verschiedene Mitbewerber anpassbar machen.\n// ═══════════════════════════════════════════════════════\n\n// --- ANPASSEN: Eigene Firma ---\nconst OWN_COMPANY_NAME = 'HanseMerkur';\nconst OWN_COMPANY_SHORT = 'HMR';\nconst OWN_PRODUCT_NAME = 'Seminar-Ruecktrittsversicherung';\n\n// --- ANPASSEN: Mitbewerber ---\nconst COMPETITOR_NAME = 'ERGO Reiseversicherung';\nconst COMPETITOR_SHORT = 'ERV';\nconst COMPETITOR_PRODUCT_NAME = 'Seminar-Versicherung';\n\n// --- ANPASSEN: RAG Collection ID des Mitbewerbers ---\nconst COMPETITOR_RAG_COLLECTION = '32c26a09-6c8c-449c-a060-1146f20c0322';\n\n// --- ANPASSEN: API Einstellungen ---\nconst API_BASE_URL = 'https://aihubtest.hanse-merkur.de';\nconst RAG_ENDPOINT = '/api/v1/retrieval/query/collection';\nconst LLM_ENDPOINT = '/api/chat/completions';\nconst LLM_MODEL = 'qwen3:30b-a3b-instruct-2507-q8_0';\nconst RAG_TOP_K = 5;\n\nreturn {\n  config: {\n    ownCompanyName: OWN_COMPANY_NAME,\n    ownCompanyShort: OWN_COMPANY_SHORT,\n    ownProductName: OWN_PRODUCT_NAME,\n    competitorName: COMPETITOR_NAME,\n    competitorShort: COMPETITOR_SHORT,\n    competitorProductName: COMPETITOR_PRODUCT_NAME,\n    competitorRagCollection: COMPETITOR_RAG_COLLECTION,\n    apiBaseUrl: API_BASE_URL,\n    ragEndpoint: RAG_ENDPOINT,\n    llmEndpoint: LLM_ENDPOINT,\n    llmModel: LLM_MODEL,\n    ragTopK: RAG_TOP_K\n  }\n};"
+      },
+      "id": "a1b2c3d4-0001-4000-a000-000000000001",
+      "name": "01 - Config Parameters",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4600,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════════\n// Step 2: Eigene Hard Facts + RAG-Queries\n// Eigene Daten = hardcoded (z.B. aus Excel/AVB)\n// Mitbewerber-Daten = werden per RAG abgefragt\n// benchmark_competitor = optionaler Referenzwert zum Abgleich\n//\n// ANPASSEN: Fakten fuer das jeweilige Produkt eintragen.\n// Die Struktur bleibt generisch:\n//   - own_data: eigene Leistung/Regelung\n//   - rag_query: Frage an die Mitbewerber-AVB\n//   - benchmark_competitor: optionaler Referenzwert\n// ═══════════════════════════════════════════════════════\n\nconst config = $('01 - Config Parameters').first().json.config;\n\nconst facts = [\n  {\n    id: 1,\n    kategorie: 'Produktuebersicht',\n    aspekt: 'Produktname und Versicherungssparten',\n    own_data: 'Seminar-Ruecktrittsversicherung. Sparte: Reise-Ruecktritt. Geltungsbereich: Europa.',\n    rag_query: `Wie heisst das Produkt der ${config.competitorName} fuer Seminare? Welche Sparten sind enthalten? Welcher raeumliche Geltungsbereich gilt?`,\n    benchmark_competitor: 'Seminar-Versicherung. Sparten: Reise-Ruecktritt und Reiseabbruch. Geltungsbereich: weltweit.'\n  },\n  {\n    id: 2,\n    kategorie: 'Produktuebersicht',\n    aspekt: 'AVB-Version und Selbstbehalt',\n    own_data: 'AVB: VB-RS 2021 (T-Seminar-D). Selbstbehalt: 20% bei ambulant behandelten Erkrankungen, mind. 25 EUR je versicherter Person.',\n    rag_query: `Welche Versicherungsbedingungen (AVB) gelten fuer die ${config.competitorName} Seminar-Versicherung? Gibt es einen Selbstbehalt oder eine Selbstbeteiligung?`,\n    benchmark_competitor: 'VB-ERV/Seminar 2017. Kein Selbstbehalt.'\n  },\n  {\n    id: 3,\n    kategorie: 'Versicherte Leistungen - Ruecktritt',\n    aspekt: 'Stornokosten bei Nichtantritt des Seminars',\n    own_data: 'Uebernahme der Stornokosten fuer das nicht angetretene Seminar.',\n    rag_query: `Was erstattet die ${config.competitorName} Seminar-Versicherung bei Stornierung bzw. Ruecktritt vom Seminar? Werden auch Stornokosten fuer Seminarreihen und zusaetzliche Reiseleistungen uebernommen?`,\n    benchmark_competitor: 'Uebernahme der Stornokosten fuer das Seminar bzw. fuer nicht besuchte Teilveranstaltungen der Seminarreihe. Uebernahme der Stornokosten fuer mitversicherte Reiseleistungen.'\n  },\n  {\n    id: 4,\n    kategorie: 'Versicherte Leistungen - Ruecktritt',\n    aspekt: 'Verspaeteter Seminarantritt',\n    own_data: 'Erstattung der Hinreise-Mehrkosten bis maximal zur Hoehe der Stornokosten, die bei einer Stornierung anfallen.',\n    rag_query: `Was leistet die ${config.competitorName} Seminar-Versicherung bei verspaetem Seminarantritt? Werden Mehrkosten der Anreise und nicht genutzte Seminarleistungen erstattet?`,\n    benchmark_competitor: 'Erstattung der Mehrkosten der Anreise. Erstattung der nicht genutzten Seminar- und Reiseleistungen abzueglich der Anreisekosten.'\n  },\n  {\n    id: 5,\n    kategorie: 'Versicherte Leistungen - Ruecktritt',\n    aspekt: 'Verspaetung oeffentliches Verkehrsmittel (mehr als 2 Stunden)',\n    own_data: 'Erstattung der Hinreise-Mehrkosten bis maximal zur Hoehe der Stornokosten.',\n    rag_query: `Was erstattet die ${config.competitorName} Seminar-Versicherung bei Verspaetung eines oeffentlichen Verkehrsmittels um mehr als zwei Stunden? Gibt es einen Verspaetungsschutz mit Betraegen fuer Anreise-Mehrkosten, Verpflegung und Unterkunft?`,\n    benchmark_competitor: 'Erstattung der Anreise-Mehrkosten bis 500 EUR. Kosten fuer Verpflegung sowie Unterkunft bis 100 EUR.'\n  },\n  {\n    id: 6,\n    kategorie: 'Versicherte Leistungen - Ruecktritt',\n    aspekt: 'Panne oder Unfall des eigenen Kraftfahrzeugs',\n    own_data: 'Nicht versichert. Nur wenn dadurch das versicherte Verkehrsmittel versaeumt wird: Erstattung der Hinreise-Mehrkosten bis maximal zur Hoehe der Stornokosten.',\n    rag_query: `Was leistet die ${config.competitorName} Seminar-Versicherung bei Panne oder Unfall des eigenen Kraftfahrzeugs? Werden Kosten fuer nicht genutzte Leistungen, zusaetzliche Reisekosten oder ein Mietfahrzeug erstattet?`,\n    benchmark_competitor: 'Erstattung der Kosten fuer nicht in Anspruch genommene Seminar- und Reiseleistungen oder zusaetzliche Reisekosten bis 500 EUR. Kostenerstattung fuer ein Mietfahrzeug bis 1.000 EUR.'\n  },\n  {\n    id: 7,\n    kategorie: 'Versicherte Leistungen - Ruecktritt',\n    aspekt: 'Umbuchung des Seminars',\n    own_data: 'Erstattung der Umbuchungskosten bis maximal zur Hoehe der Stornokosten.',\n    rag_query: `Sind Umbuchungsgebuehren bei der ${config.competitorName} Seminar-Versicherung versichert? Bis zu welcher Hoehe werden Umbuchungsgebuehren erstattet?`,\n    benchmark_competitor: 'Erstattung der Umbuchungsgebuehren, max. bis zur Hoehe der Stornokosten.'\n  },\n  {\n    id: 8,\n    kategorie: 'Reiseabbruch',\n    aspekt: 'Abbruch des Seminars',\n    own_data: 'Nicht versichert.',\n    rag_query: `Was leistet die ${config.competitorName} Seminar-Versicherung bei Abbruch des Seminars? Werden anteilige Preise fuer nicht genutzte Leistungen und zusaetzliche Rueckreisekosten erstattet?`,\n    benchmark_competitor: 'Erstattung des anteiligen Preises fuer nicht genutzte Seminar- und Reiseleistungen vor Ort. Erstattung der zusaetzlichen Rueckreisekosten.'\n  },\n  {\n    id: 9,\n    kategorie: 'Reiseabbruch',\n    aspekt: 'Verspaetete Rueckreise vom Seminar',\n    own_data: 'Nicht versichert.',\n    rag_query: `Hilft die ${config.competitorName} Seminar-Versicherung bei verspaeteter Rueckreise vom Seminar? Wird die Rueckreise organisiert oder ein Darlehen fuer Mehrkosten gewaehrt?`,\n    benchmark_competitor: 'Organisation der Rueckreise und Darlehen fuer Rueckreise-Mehrkosten.'\n  },\n  {\n    id: 10,\n    kategorie: 'Reiseabbruch',\n    aspekt: 'Verlaengerter Aufenthalt wegen stationaerer Behandlung',\n    own_data: 'Nicht versichert.',\n    rag_query: `Erstattet die ${config.competitorName} Seminar-Versicherung zusaetzliche Unterkunftskosten bei verlaengertem Aufenthalt wegen stationaerer Behandlung? Bis zu welchem Betrag?`,\n    benchmark_competitor: 'Erstattung zusaetzlicher Unterkunftskosten bis zu 1.500 EUR je Versicherungsfall.'\n  },\n  {\n    id: 11,\n    kategorie: 'Reiseabbruch',\n    aspekt: 'Verlaengerter Aufenthalt wegen ambulanter Behandlung',\n    own_data: 'Nicht versichert.',\n    rag_query: `Erstattet die ${config.competitorName} Seminar-Versicherung zusaetzliche Unterkunftskosten bei verlaengertem Aufenthalt wegen ambulanter Behandlung? Bis zu welchem Betrag?`,\n    benchmark_competitor: 'Erstattung zusaetzlicher Unterkunftskosten bis zu 750 EUR je Versicherungsfall.'\n  },\n  {\n    id: 12,\n    kategorie: 'Reiseabbruch',\n    aspekt: 'Verlaengerter Aufenthalt wegen Feuer oder Elementarereignissen',\n    own_data: 'Nicht versichert.',\n    rag_query: `Was leistet die ${config.competitorName} Seminar-Versicherung bei Feuer oder Elementarereignissen am Seminarort? Werden Mehrkosten fuer verlaengerten Aufenthalt und ausserplanmaessige Rueckreise erstattet?`,\n    benchmark_competitor: 'Mehrkosten fuer verlaengerten Aufenthalt. Mehrkosten fuer ausserplanmaessige Rueckreise.'\n  },\n  {\n    id: 13,\n    kategorie: 'Versicherte Ereignisse',\n    aspekt: 'Nichtversetzung als Schueler oder Student',\n    own_data: 'Versichert.',\n    rag_query: `Ist Nichtversetzung eines Schuelers oder Studenten ein versichertes Ereignis bei der ${config.competitorName} Seminar-Versicherung? Welche Pruefungsereignisse sind versichert?`,\n    benchmark_competitor: 'Nicht versichert.'\n  },\n  {\n    id: 14,\n    kategorie: 'Versicherte Ereignisse',\n    aspekt: 'Panne oder Unfall des Kraftfahrzeuges als Ruecktrittsgrund',\n    own_data: 'Nicht direkt versichert. Nur indirekt wenn dadurch das versicherte Verkehrsmittel versaeumt wird.',\n    rag_query: `Ist Panne oder Unfall des eigenen Kraftfahrzeugs ein versichertes Ereignis bei der ${config.competitorName} Seminar-Versicherung das zum Ruecktritt berechtigt?`,\n    benchmark_competitor: 'Versichert.'\n  },\n  {\n    id: 15,\n    kategorie: 'Versicherte Ereignisse',\n    aspekt: 'Erkrankung, Unfall oder Tod eines Hundes oder einer Katze',\n    own_data: 'Versichert.',\n    rag_query: `Ist die Erkrankung, der Unfall oder Tod eines Hundes oder einer Katze ein versichertes Ereignis bei der ${config.competitorName} Seminar-Versicherung?`,\n    benchmark_competitor: 'Nicht versichert.'\n  },\n  {\n    id: 16,\n    kategorie: 'Versicherte Ereignisse',\n    aspekt: 'Feuer oder Elementarereignisse am Seminarort',\n    own_data: 'Nicht versichert.',\n    rag_query: `Sind Feuer oder Elementarereignisse am Seminarort versicherte Ereignisse bei der ${config.competitorName} Seminar-Versicherung? Was zaehlt als Elementarereignis?`,\n    benchmark_competitor: 'Versichert.'\n  },\n  {\n    id: 17,\n    kategorie: 'Versicherte Ereignisse',\n    aspekt: 'Absage durch den Veranstalter',\n    own_data: 'Nicht versichert.',\n    rag_query: `Ist die Absage des Seminars durch den Veranstalter ein versichertes Ereignis bei der ${config.competitorName} Seminar-Versicherung? Was wird in diesem Fall erstattet?`,\n    benchmark_competitor: 'Versichert.'\n  },\n  {\n    id: 18,\n    kategorie: 'Weiteres',\n    aspekt: 'Mitversicherung zusaetzlich gebuchter Reiseleistungen',\n    own_data: 'Nicht versichert. Die Versicherungssumme sichert den Seminarpreis ab. Weitere Reiseleistungen muessen separat versichert werden.',\n    rag_query: `Sind zusaetzlich gebuchte Reiseleistungen wie Anreise, Rueckreise und Unterkunft bei der ${config.competitorName} Seminar-Versicherung mitversichert? Welche zeitlichen Voraussetzungen gelten?`,\n    benchmark_competitor: 'Versichert, vorausgesetzt sie liegen innerhalb 48 Stunden vor Beginn bis 48 Stunden nach Ende des Seminars.'\n  },\n  {\n    id: 19,\n    kategorie: 'Weiteres',\n    aspekt: 'Maximal versicherbarer Zeitraum und Seminarreihen',\n    own_data: '1 Seminarreise, unabhaengig von der Seminardauer. Bei Seminarreihen muss jedes Modul separat abgeschlossen werden.',\n    rag_query: `Wie lange ist der maximal versicherbare Zeitraum bei der ${config.competitorName} Seminar-Versicherung? Koennen Seminarreihen mit mehreren Teilveranstaltungen versichert werden? Bis zu welcher Dauer?`,\n    benchmark_competitor: '1 Seminarreise oder -reihe, unabhaengig von der Seminardauer, auch fuer Seminarreihen bis 2 Jahre.'\n  },\n  {\n    id: 20,\n    kategorie: 'Weiteres',\n    aspekt: 'Abschlussfristen',\n    own_data: 'Abschluss bis 30 Tage vor Reisebeginn oder spaetestens bis zum 3. Werktag nach der Reisebuchung.',\n    rag_query: `Welche Abschlussfristen gelten fuer die ${config.competitorName} Seminar-Versicherung? Bis wann muss der Versicherungsvertrag abgeschlossen werden?`,\n    benchmark_competitor: 'Am Buchungstag, spaetestens 30 Tage vor planmaessigem Antritt. Bei Buchung innerhalb von 30 Tagen vor Antritt nur am Buchungstag, spaetestens innerhalb der naechsten 3 Werktage.'\n  }\n];\n\nreturn facts.map(f => ({ json: { ...f, config: config } }));"
+      },
+      "id": "a1b2c3d4-0002-4000-a000-000000000002",
+      "name": "02 - Eigene Fakten + RAG Queries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4360,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        }
+      },
+      "id": "a1b2c3d4-0003-4000-a000-000000000003",
+      "name": "03 - Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -4120,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ═══════════════════════════════════════════════════════\n// Step 4: Build RAG Request gegen Mitbewerber Collection\n// Generisch: Verwendet die Collection-ID aus der Config\n// ═══════════════════════════════════════════════════════\nconst fact = $input.item.json;\nconst config = fact.config;\n\nreturn {\n  ...fact,\n  retrievalRequestBody: JSON.stringify({\n    collection_names: [config.competitorRagCollection],\n    query: fact.rag_query,\n    k: config.ragTopK\n  })\n};"
+      },
+      "id": "a1b2c3d4-0004-4000-a000-000000000004",
+      "name": "04 - Build RAG Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3880,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('01 - Config Parameters').first().json.config.apiBaseUrl }}{{ $('01 - Config Parameters').first().json.config.ragEndpoint }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $credentials.httpHeaderAuth.value }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.retrievalRequestBody }}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0005-4000-a000-000000000005",
+      "name": "05 - RAG Retrieve Mitbewerber AVB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -3640,
+        400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID_HERE",
+          "name": "AI Hub API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ═══════════════════════════════════════════════════════\n// Step 6: Parse RAG + Build LLM Comparison Request\n// Generisch: Verwendet Config fuer Firmennamen und Modell\n// Das LLM extrahiert Mitbewerber-Infos AUS DEM RAG\n// ═══════════════════════════════════════════════════════\nconst ragResp = $input.item.json;\nconst fact = $('04 - Build RAG Request').item.json;\nconst config = fact.config;\n\nconst docs = ragResp.documents?.[0] || [];\nconst metas = ragResp.metadatas?.[0] || [];\nconst dists = ragResp.distances?.[0] || [];\n\nconst contextChunks = docs.map((text, i) => {\n  const meta = metas[i] || {};\n  const source = (meta.name || meta.source || 'Unbekannt')\n    .replace(/\\.md\\.txt$|\\.txt$|\\.md$/gi, '').replace(/_/g, ' ').trim();\n  const dist = dists[i] || 'N/A';\n  return '### Chunk ' + (i+1) + ' (Quelle: ' + source + ', Distance: ' + (typeof dist === 'number' ? dist.toFixed(3) : dist) + ')\\n' + text;\n}).join('\\n\\n');\n\nconst systemPrompt = `Du bist ein Versicherungsexperte, der AVB (Allgemeine Versicherungsbedingungen) analysiert und vergleicht.\n\nDeine Aufgabe: Analysiere die bereitgestellten ${config.competitorName} AVB-Dokumente zu einem bestimmten Aspekt und vergleiche das Ergebnis mit der ${config.ownCompanyName} ${config.ownProductName}.\n\n## WICHTIGE REGELN:\n1. Extrahiere die ${config.competitorShort}-Informationen AUSSCHLIEssLICH aus den bereitgestellten RAG-Dokumenten\n2. Wenn die Dokumente KEINE Information zu diesem Aspekt enthalten, schreibe klar: \"In den vorliegenden ${config.competitorShort} AVB wurde hierzu keine Regelung gefunden.\"\n3. ERFINDE KEINE Informationen - nur was in den Dokumenten steht\n4. Sei praezise: Nenne konkrete Betraege, Prozentsaetze, Bedingungen, Paragraphen\n5. Zitiere relevante Passagen aus den Dokumenten\n6. Bewerte am Ende: Welcher Anbieter bietet hier den besseren Schutz? (${config.ownCompanyShort} besser / ${config.competitorShort} besser / gleichwertig / nicht vergleichbar)\n7. Antworte auf Deutsch in strukturierter Form\n\n## Bereitgestellte ${config.competitorShort} AVB-Dokumente:\n` + contextChunks;\n\nconst userPrompt = `Analysiere und vergleiche folgenden Aspekt:\n\n**Kategorie:** ${fact.kategorie}\n**Aspekt:** ${fact.aspekt}\n\n**${config.ownCompanyName} (${config.ownCompanyShort}) Regelung:**\n${fact.own_data}\n\n**Frage an die ${config.competitorShort} AVB:**\n${fact.rag_query}\n\nBitte:\n1. Was genau sagen die ${config.competitorShort} AVB-Dokumente zu diesem Aspekt? Zitiere relevante Stellen.\n2. Fasse die ${config.competitorShort}-Regelung in 1-3 Saetzen zusammen\n3. Vergleiche mit der ${config.ownCompanyShort}-Regelung: Was sind die konkreten Unterschiede?\n4. Bewertung: Wer bietet den besseren Schutz fuer diesen Aspekt?`;\n\nreturn {\n  ...fact,\n  ragContext: contextChunks,\n  ragChunkCount: docs.length,\n  ragDistances: dists.filter(d => typeof d === 'number').map(d => d.toFixed(3)),\n  requestBody: JSON.stringify({\n    model: config.llmModel,\n    messages: [\n      { role: 'system', content: systemPrompt },\n      { role: 'user', content: userPrompt }\n    ],\n    temperature: 0.2,\n    max_tokens: 1200,\n    stream: false\n  })\n};"
+      },
+      "id": "a1b2c3d4-0006-4000-a000-000000000006",
+      "name": "06 - Parse RAG + Build LLM Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3400,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('01 - Config Parameters').first().json.config.apiBaseUrl }}{{ $('01 - Config Parameters').first().json.config.llmEndpoint }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $credentials.httpHeaderAuth.value }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.requestBody }}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0007-4000-a000-000000000007",
+      "name": "07 - LLM Fakt-Vergleich",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -3160,
+        400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID_HERE",
+          "name": "AI Hub API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ═══════════════════════════════════════════════════════\n// Step 8: Parse LLM Result + Benchmark-Abgleich\n// Generisch: Verwendet config fuer Firmennamen\n// ═══════════════════════════════════════════════════════\nconst llmResp = $input.item.json;\nconst fact = $('06 - Parse RAG + Build LLM Request').item.json;\nconst config = fact.config;\n\nlet answer = (llmResp.choices?.[0]?.message?.content || '')\n  .replace(/<think>[\\s\\S]*?<\\/think>/g, '')\n  .trim();\n\n// Bewertung extrahieren (letzter Satz oder Zeile mit 'besser'/'gleichwertig')\nlet bewertung = 'nicht ermittelt';\nconst bewertungMatch = answer.match(new RegExp(\n  `(${config.ownCompanyShort}\\\\s+besser|${config.competitorShort}\\\\s+besser|gleichwertig|nicht vergleichbar)`,\n  'i'\n));\nif (bewertungMatch) {\n  bewertung = bewertungMatch[1];\n}\n\nreturn {\n  id: fact.id,\n  kategorie: fact.kategorie,\n  aspekt: fact.aspekt,\n  own_data: fact.own_data,\n  benchmark_competitor: fact.benchmark_competitor,\n  vergleich_aus_rag: answer,\n  bewertung: bewertung,\n  ragChunkCount: fact.ragChunkCount,\n  ragDistances: fact.ragDistances,\n  tokens: llmResp.usage?.total_tokens || 0,\n  config: config\n};"
+      },
+      "id": "a1b2c3d4-0008-4000-a000-000000000008",
+      "name": "08 - Parse Vergleichsergebnis",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2920,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ═══════════════════════════════════════════════════════\n// Step 9: Build Final Synthesis\n// Sammelt ALLE Einzelvergleiche und baut den\n// finalen LLM-Request fuer die Gesamtgegenueberstellung\n// Generisch: Verwendet Config fuer Firmennamen\n// ═══════════════════════════════════════════════════════\nconst allItems = $input.all();\nconst results = allItems.map(item => item.json);\nconst config = results[0]?.config || {};\n\nconst comparisonSections = results.map(r => {\n  return '## ' + r.id + '. ' + r.kategorie + ' - ' + r.aspekt + '\\n\\n' +\n    '**' + config.ownCompanyName + ' (' + config.ownCompanyShort + '):** ' + r.own_data + '\\n\\n' +\n    '**' + config.competitorShort + ' laut RAG-Analyse:**\\n' + r.vergleich_aus_rag + '\\n\\n' +\n    '**Benchmark (Excel-Referenz):** ' + r.benchmark_competitor + '\\n' +\n    '*RAG Chunks: ' + r.ragChunkCount + ' | Distances: ' + (r.ragDistances || []).join(', ') + '*\\n';\n}).join('\\n---\\n\\n');\n\nconst systemPrompt = `Du bist ein Versicherungsexperte der ${config.ownCompanyName}. ` +\n  `Du erstellst eine Executive Summary eines AVB-Vergleichs zwischen der ` +\n  `${config.ownCompanyName} ${config.ownProductName} und der ${config.competitorName} ${config.competitorProductName}.\\n\\n` +\n  `Die Einzelvergleiche basieren auf einer RAG-Analyse der ${config.competitorShort} AVB-Dokumente. ` +\n  'Zusaetzlich ist ein Benchmark-Wert aus einer manuellen Excel-Analyse angegeben.\\n\\n' +\n  '## Aufgabe:\\n' +\n  'Erstelle basierend auf den Einzelvergleichen eine strukturierte Gegenueberstellung mit:\\n\\n' +\n  `1. **Executive Summary** (3-5 Saetze Gesamtbewertung)\\n` +\n  `2. **Vorteile ${config.ownCompanyName}** (Bullet-Liste: wo ${config.ownCompanyShort} besser ist, mit konkreten Details)\\n` +\n  `3. **Vorteile ${config.competitorName}** (Bullet-Liste: wo ${config.competitorShort} besser ist, mit konkreten Details)\\n` +\n  '4. **Gleichwertige Leistungen** (wo beide aehnlich sind)\\n' +\n  '5. **Kritische Unterschiede** (die wichtigsten Differenzen fuer die Kundenberatung)\\n' +\n  `6. **Handlungsempfehlung fuer Produktmanagement** (wo sollte ${config.ownCompanyShort} nachbessern?)\\n` +\n  '7. **RAG-Qualitaetsbericht** (Vergleiche die RAG-Ergebnisse mit den Benchmark-Werten: ' +\n  'Wo stimmen sie ueberein? Wo gibt es Abweichungen? ' +\n  'Welche Aspekte konnten nicht aus den AVB ermittelt werden?)\\n\\n' +\n  'Formatiere als Markdown. Sei praezise und faktenbasiert. ' +\n  'Unterscheide klar zwischen Fakten aus den AVB und eigenen Bewertungen.';\n\nconst userPrompt = 'Hier sind die ' + results.length + ' Einzelvergleiche ' +\n  '(jeweils mit RAG-Ergebnis und Excel-Benchmark):\\n\\n' +\n  comparisonSections + '\\n\\n' +\n  'Erstelle bitte die Gesamtgegenueberstellung mit RAG-Qualitaetsbericht.';\n\nreturn [{\n  json: {\n    allResults: results,\n    resultCount: results.length,\n    config: config,\n    requestBody: JSON.stringify({\n      model: config.llmModel,\n      messages: [\n        { role: 'system', content: systemPrompt },\n        { role: 'user', content: userPrompt }\n      ],\n      temperature: 0.3,\n      max_tokens: 4000,\n      stream: false\n    })\n  }\n}];"
+      },
+      "id": "a1b2c3d4-0009-4000-a000-000000000009",
+      "name": "09 - Build Synthese-Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3720,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('01 - Config Parameters').first().json.config.apiBaseUrl }}{{ $('01 - Config Parameters').first().json.config.llmEndpoint }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $credentials.httpHeaderAuth.value }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.requestBody }}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0010-4000-a000-000000000010",
+      "name": "10 - LLM Gesamtvergleich",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -3120,
+        16
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "CREDENTIAL_ID_HERE",
+          "name": "AI Hub API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ═══════════════════════════════════════════════════════\n// Step 11: Parse Final Synthesis + Build Output\n// ═══════════════════════════════════════════════════════\nconst llmResp = $input.item.json;\nconst synthData = $('09 - Build Synthese-Request').item.json;\nconst config = synthData.config;\n\nlet synthesis = (llmResp.choices?.[0]?.message?.content || '')\n  .replace(/<think>[\\s\\S]*?<\\/think>/g, '')\n  .trim();\n\nconst usage = llmResp.usage || {};\n\nreturn {\n  gesamtvergleich: synthesis,\n  einzelvergleiche: synthData.allResults,\n  anzahlFakten: synthData.resultCount,\n  model: llmResp.model || config.llmModel,\n  config: config,\n  usage: {\n    promptTokens: usage.prompt_tokens || 0,\n    completionTokens: usage.completion_tokens || 0,\n    totalTokens: usage.total_tokens || 0\n  },\n  timestamp: new Date().toISOString(),\n  status: 'completed'\n};"
+      },
+      "id": "a1b2c3d4-0011-4000-a000-000000000011",
+      "name": "11 - Parse Gesamtvergleich",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2760,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ═══════════════════════════════════════════════════════\n// Step 12: Report-Tabelle erstellen\n// Erzeugt eine strukturierte Tabelle mit allen Ergebnissen\n// fuer die Anzeige in n8n und fuer den Export\n// ═══════════════════════════════════════════════════════\nconst data = $input.item.json;\nconst config = data.config;\nconst einzelvergleiche = data.einzelvergleiche || [];\n\n// --- Tabellen-Zeilen als Array of Objects (fuer n8n Table View) ---\nconst reportTable = einzelvergleiche.map(e => ({\n  Nr: e.id,\n  Kategorie: e.kategorie,\n  Aspekt: e.aspekt,\n  [config.ownCompanyShort]: e.own_data,\n  [`${config.competitorShort} (RAG)`]: (e.vergleich_aus_rag || '').substring(0, 300) + ((e.vergleich_aus_rag || '').length > 300 ? '...' : ''),\n  [`${config.competitorShort} (Benchmark)`]: e.benchmark_competitor,\n  Bewertung: e.bewertung || 'nicht ermittelt',\n  RAG_Chunks: e.ragChunkCount,\n  RAG_Distances: (e.ragDistances || []).join(', '),\n  Tokens: e.tokens\n}));\n\n// --- Zusammenfassung ---\nconst ownBetter = einzelvergleiche.filter(e => (e.bewertung || '').toLowerCase().includes(config.ownCompanyShort.toLowerCase() + ' besser')).length;\nconst compBetter = einzelvergleiche.filter(e => (e.bewertung || '').toLowerCase().includes(config.competitorShort.toLowerCase() + ' besser')).length;\nconst equal = einzelvergleiche.filter(e => (e.bewertung || '').toLowerCase().includes('gleichwertig')).length;\nconst unclear = einzelvergleiche.length - ownBetter - compBetter - equal;\n\nreturn {\n  reportTable: reportTable,\n  summary: {\n    totalFacts: einzelvergleiche.length,\n    ownBetter: ownBetter,\n    competitorBetter: compBetter,\n    equal: equal,\n    unclear: unclear,\n    ownCompany: config.ownCompanyName,\n    competitor: config.competitorName\n  },\n  gesamtvergleich: data.gesamtvergleich,\n  config: config,\n  meta: {\n    model: data.model,\n    usage: data.usage,\n    timestamp: data.timestamp,\n    status: data.status\n  }\n};"
+      },
+      "id": "a1b2c3d4-0012-4000-a000-000000000012",
+      "name": "12 - Build Report Table",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2400,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ═══════════════════════════════════════════════════════\n// Step 13: Final Report Output\n// Erzeugt den vollstaendigen Report als Markdown\n// mit Tabelle und Zusammenfassung\n// ═══════════════════════════════════════════════════════\nconst data = $input.item.json;\nconst config = data.config;\nconst reportTable = data.reportTable || [];\nconst summary = data.summary || {};\n\n// --- Markdown Report Table ---\nconst tableHeader = `| Nr | Kategorie | Aspekt | ${config.ownCompanyShort} | ${config.competitorShort} (RAG) | ${config.competitorShort} (Benchmark) | Bewertung |`;\nconst tableSeparator = '|-----|-----------|--------|' + '-'.repeat(config.ownCompanyShort.length + 2) + '|' + '-'.repeat(config.competitorShort.length + 8) + '|' + '-'.repeat(config.competitorShort.length + 14) + '|-----------|';\nconst tableRows = reportTable.map(r =>\n  `| ${r.Nr} | ${r.Kategorie} | ${r.Aspekt} | ${r[config.ownCompanyShort] || ''} | ${r[config.competitorShort + ' (RAG)'] || ''} | ${r[config.competitorShort + ' (Benchmark)'] || ''} | ${r.Bewertung} |`\n).join('\\n');\n\nconst summaryBlock = `## Zusammenfassung\\n\\n` +\n  `| Metrik | Wert |\\n` +\n  `|--------|------|\\n` +\n  `| Verglichene Fakten | ${summary.totalFacts} |\\n` +\n  `| ${config.ownCompanyShort} besser | ${summary.ownBetter} |\\n` +\n  `| ${config.competitorShort} besser | ${summary.competitorBetter} |\\n` +\n  `| Gleichwertig | ${summary.equal} |\\n` +\n  `| Nicht eindeutig | ${summary.unclear} |\\n`;\n\nconst fullReport = `# AVB-Vergleich: ${config.ownCompanyName} vs. ${config.competitorName}\\n\\n` +\n  `**Erstellt:** ${data.meta.timestamp}\\n` +\n  `**Modell:** ${data.meta.model}\\n` +\n  `**Verglichene Fakten:** ${summary.totalFacts}\\n` +\n  `**Gesamt-Tokens Synthese:** ${data.meta.usage.totalTokens}\\n` +\n  `**Mitbewerber-Datenquelle:** RAG Collection ${config.competitorRagCollection}\\n\\n` +\n  '---\\n\\n' +\n  summaryBlock + '\\n\\n' +\n  '---\\n\\n' +\n  '# Executive Summary und Gegenueberstellung\\n\\n' +\n  data.gesamtvergleich + '\\n\\n' +\n  '---\\n\\n' +\n  '# Vergleichstabelle\\n\\n' +\n  tableHeader + '\\n' + tableSeparator + '\\n' + tableRows + '\\n';\n\n// Return both the structured table (for n8n table view) and the full report\nreturn {\n  report: fullReport,\n  reportTable: reportTable,\n  summary: summary,\n  gesamtvergleich: data.gesamtvergleich,\n  meta: data.meta\n};"
+      },
+      "id": "a1b2c3d4-0013-4000-a000-000000000013",
+      "name": "13 - Final Report Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2040,
+        64
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "01 - Config Parameters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "01 - Config Parameters": {
+      "main": [
+        [
+          {
+            "node": "02 - Eigene Fakten + RAG Queries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "02 - Eigene Fakten + RAG Queries": {
+      "main": [
+        [
+          {
+            "node": "03 - Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "03 - Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "04 - Build RAG Request",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "09 - Build Synthese-Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "04 - Build RAG Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "04 - Build RAG Request": {
+      "main": [
+        [
+          {
+            "node": "05 - RAG Retrieve Mitbewerber AVB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "05 - RAG Retrieve Mitbewerber AVB": {
+      "main": [
+        [
+          {
+            "node": "06 - Parse RAG + Build LLM Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "06 - Parse RAG + Build LLM Request": {
+      "main": [
+        [
+          {
+            "node": "07 - LLM Fakt-Vergleich",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "07 - LLM Fakt-Vergleich": {
+      "main": [
+        [
+          {
+            "node": "08 - Parse Vergleichsergebnis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "08 - Parse Vergleichsergebnis": {
+      "main": [
+        [
+          {
+            "node": "03 - Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "09 - Build Synthese-Request": {
+      "main": [
+        [
+          {
+            "node": "10 - LLM Gesamtvergleich",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10 - LLM Gesamtvergleich": {
+      "main": [
+        [
+          {
+            "node": "11 - Parse Gesamtvergleich",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "11 - Parse Gesamtvergleich": {
+      "main": [
+        [
+          {
+            "node": "12 - Build Report Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "12 - Build Report Table": {
+      "main": [
+        [
+          {
+            "node": "13 - Final Report Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "tags": [
+    {
+      "name": "AVB-Vergleich"
+    },
+    {
+      "name": "Generisch"
+    },
+    {
+      "name": "Mitbewerber"
+    }
+  ]
+}
