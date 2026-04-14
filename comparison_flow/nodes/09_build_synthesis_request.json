@@ -6,8 +6,5 @@
   "name": "09 - Build Synthese-Request",
   "type": "n8n-nodes-base.code",
   "typeVersion": 2,
-  "position": [
-    -3720,
-    64
-  ]
+  "position": [-3720, 64]
 }

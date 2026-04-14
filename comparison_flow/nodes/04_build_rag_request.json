@@ -7,8 +7,5 @@
   "name": "04 - Build RAG Request",
   "type": "n8n-nodes-base.code",
   "typeVersion": 2,
-  "position": [
-    -3880,
-    400
-  ]
+  "position": [-3880, 400]
 }

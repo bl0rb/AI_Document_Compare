@@ -7,8 +7,5 @@
   "name": "13 - Final Report Output",
   "type": "n8n-nodes-base.code",
   "typeVersion": 2,
-  "position": [
-    -2040,
-    64
-  ]
+  "position": [-2040, 64]
 }

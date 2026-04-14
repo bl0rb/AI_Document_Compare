@@ -7,8 +7,5 @@
   "name": "08 - Parse Vergleichsergebnis",
   "type": "n8n-nodes-base.code",
   "typeVersion": 2,
-  "position": [
-    -2920,
-    400
-  ]
+  "position": [-2920, 400]
 }

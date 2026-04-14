@@ -6,8 +6,5 @@
   "name": "02 - Eigene Fakten + RAG Queries",
   "type": "n8n-nodes-base.code",
   "typeVersion": 2,
-  "position": [
-    -4360,
-    400
-  ]
+  "position": [-4360, 400]
 }
