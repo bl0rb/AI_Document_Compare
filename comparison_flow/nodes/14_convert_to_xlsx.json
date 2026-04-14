@@ -1,0 +1,15 @@
+{
+  "parameters": {
+    "operation": "toFile",
+    "fileFormat": "xlsx",
+    "options": {
+      "fileName": "avb_vergleich_report.xlsx",
+      "sheetName": "Vergleich"
+    }
+  },
+  "id": "a1b2c3d4-0014-4000-a000-000000000014",
+  "name": "14 - Convert to XLSX",
+  "type": "n8n-nodes-base.spreadsheetFile",
+  "typeVersion": 2,
+  "position": [-1680, 64]
+}
